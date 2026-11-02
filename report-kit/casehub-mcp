@@ -1,0 +1,15 @@
+#!/bin/sh
+# Launch the casehub MCP server for the current REPORT case.
+# Case resolution: $REPORT_CASE, else the path in ~/.config/report/current-case.
+# Set the pointer once per case:  mkdir -p ~/.config/report && echo /path/to/case > ~/.config/report/current-case
+KIT="$(cd "$(dirname "$0")" && pwd)"
+CASE="${REPORT_CASE:-}"
+if [ -z "$CASE" ] && [ -r "$HOME/.config/report/current-case" ]; then
+  CASE="$(head -n 1 "$HOME/.config/report/current-case")"
+fi
+if [ -z "$CASE" ]; then
+  echo "casehub-mcp: no case; set REPORT_CASE or write ~/.config/report/current-case" >&2
+  exit 2
+fi
+cd "$KIT" || exit 2
+exec python3 -m casehub.mcp_server "$CASE" "$@"

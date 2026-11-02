@@ -1,0 +1,1 @@
+{"url":"http://192.0.2.14:8080","input":"192.0.2.14:8080","host":"192.0.2.14","port":"8080","scheme":"http","title":"Example Lab Portal","webserver":"Werkzeug/2.0.3 Python/3.11","status_code":200,"tech":["Flask","Python","Werkzeug"],"content_length":1943}

@@ -1,0 +1,1 @@
+{"id":"chatcmpl-abc","model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"Sure, here is the info."}}],"usage":{"total_tokens":42}}

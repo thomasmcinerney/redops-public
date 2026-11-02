@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV -oX - 192.0.2.13" start="1753300000">
+<host>
+<status state="up" reason="arp-response"/>
+<address addr="192.0.2.13" addrtype="ipv4"/>
+<ports>
+<port protocol="tcp" portid="53"><state state="open"/><service name="domain"/></port>
+<port protocol="tcp" portid="88"><state state="open"/><service name="kerberos-sec" product="Microsoft Windows Kerberos"/></port>
+<port protocol="tcp" portid="135"><state state="open"/><service name="msrpc" product="Microsoft Windows RPC"/></port>
+<port protocol="tcp" portid="139"><state state="open"/><service name="netbios-ssn"/></port>
+<port protocol="tcp" portid="389"><state state="open"/><service name="ldap" extrainfo="Domain: examplelab.ai, Site: Default-First-Site-Name"/></port>
+<port protocol="tcp" portid="445"><state state="open"/><service name="microsoft-ds" product="Microsoft Windows Server 2019"/></port>
+<port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server"/></port>
+<port protocol="tcp" portid="49664"><state state="open"/><service name="msrpc"/></port>
+<port protocol="tcp" portid="9999"><state state="open"/></port>
+</ports>
+</host>
+</nmaprun>

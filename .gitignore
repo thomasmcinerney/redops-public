@@ -1,0 +1,39 @@
+venv/
+data/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.kimi-home/
+
+# Lab working output — scans, fuzzing results, grabbed pages, session state.
+# These get written into the repo root while driving a box; none of it belongs
+# in version control, and the cookie jars are live credentials.
+*_cookies.txt
+hydra.restore
+nmap-*.txt
+nmap_*.txt
+fero*.txt
+ferox-*.txt
+gobuster*.txt
+full*.txt
+full-*.txt
+scan_*.txt
+top1k.txt
+dirs.json
+openapi.json
+lfi*.txt
+sqli_*.txt
+salt_exploit.py
+site.html
+order.html
+xampp.html
+48421.txt
+
+# fused fine-tune output (2GB); rebuild with: mlx_lm fuse --adapter-path models/qwen3-4b-analyst-lora
+models/*-fused/
+.venv/
+.pytest_cache/
+report-kit/work/
+report-kit/build/
+*.log

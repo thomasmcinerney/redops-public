@@ -1,0 +1,2 @@
+{"template-id":"CVE-2099-99999","info":{"name":"Qdrant unauth file write","severity":"critical","description":"POST /logger arbitrary file append","tags":["cve","qdrant","rce"]},"type":"http","host":"192.0.2.14:6333","matched-at":"http://192.0.2.14:6333/logger"}
+{"template-id":"tech-detect","info":{"name":"Werkzeug debug","severity":"low","tags":["tech"]},"type":"http","host":"192.0.2.14:8080","matched-at":"http://192.0.2.14:8080/console"}

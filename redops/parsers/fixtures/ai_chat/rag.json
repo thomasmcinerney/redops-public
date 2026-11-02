@@ -1,0 +1,4 @@
+{"answer":"The deploy token lives in the internal wiki.",
+ "sources":[{"chunk_id":"c1","score":0.82,"collection":"research-kb","source":"internal-wiki/deploy.md"},
+            {"chunk_id":"c2","score":0.61,"collection":"research-kb","title":"public faq"}],
+ "session_id":"MC-20260723-0042"}

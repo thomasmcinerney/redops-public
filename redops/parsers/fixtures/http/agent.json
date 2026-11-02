@@ -1,0 +1,3 @@
+{"name": "ResearchAssistant",
+ "metadata": {"model": "gpt-4o-mini"},
+ "skills": [{"name": "search"}, {"name": "summarize"}, {"id": "ingest"}]}

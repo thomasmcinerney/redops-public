@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RedOps</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🎯</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="logo">RED<span>OPS</span></div>
+  <nav>
+    <a href="/board.html" class="board-link" title="Live game board (situational view)">◆ BOARD</a>
+    <button data-tab="sitrep" class="active">Sitrep</button>
+    <button data-tab="map">Map</button>
+    <button data-tab="intel">Intel</button>
+    <button data-tab="leads">Leads</button>
+    <button data-tab="arsenal">Arsenal</button>
+    <button data-tab="feed">Feed</button>
+    <button data-tab="targets">Targets</button>
+    <button data-tab="objtasks">Objectives &amp; Tasks</button>
+    <button data-tab="evidence">Evidence</button>
+    <button data-tab="report">Report</button>
+    <button data-tab="manage">&#9881; Manage</button>
+  </nav>
+  <select id="engsel" title="Active engagement"></select>
+  <button id="eng-new" title="New engagement">+ New</button>
+  <span id="live">&#9679; connecting</span>
+</header>
+<div id="healthbanner" style="display:none"></div>
+
+<main>
+  <!-- SITREP -->
+  <section id="tab-sitrep" class="tab active">
+    <div class="panel intent-card">
+      <h3>Commander's intent</h3>
+      <textarea id="sr-intent" rows="2" placeholder="user-owned: what the commander wants achieved; overrides agent next_steps on conflict"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="act" id="sr-intent-save">Save intent</button>
+        <span class="grow"></span>
+        <span class="small" style="color:var(--dim)">allowlist:</span>
+        <input id="scope-in" placeholder="198.51.100.0/24 (empty = off)" size="24">
+        <span class="small" style="color:var(--dim)">blocklist:</span>
+        <input id="scope-out" placeholder="10.0.0.0/8, 192.168.99.99" size="22">
+        <button class="act" id="scope-save">Save scope</button>
+      </div>
+    </div>
+    <div class="sitrep-cards">
+      <div class="panel">
+        <h3>Current activity</h3>
+        <textarea id="sr-activity" rows="3" placeholder="what is happening right now"></textarea>
+      </div>
+      <div class="panel">
+        <h3>Working hypothesis</h3>
+        <textarea id="sr-hypothesis" rows="3" placeholder="what we think is true"></textarea>
+      </div>
+      <div class="panel">
+        <h3>Next steps</h3>
+        <textarea id="sr-next" rows="3" placeholder="what we do next"></textarea>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="act" id="sr-save">Save sitrep</button>
+      <span id="sr-updated" class="small" style="color:var(--dim)"></span>
+    </div>
+    <div class="panel">
+      <h3>&#9889; Open opportunities</h3>
+      <div id="opp-list"></div>
+    </div>
+    <div class="sitrep-cards">
+      <div class="panel">
+        <h3>Recent key facts</h3>
+        <div id="recent-facts"></div>
+      </div>
+      <div class="panel">
+        <h3>Ruled-out dead ends</h3>
+        <div id="ruledout-facts"></div>
+      </div>
+      <div class="panel">
+        <h3>Pending tasks</h3>
+        <div id="pending-tasks"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="tab-map" class="tab">
+    <div class="map-wrap">
+      <div class="panel" style="flex:1; overflow:hidden">
+        <svg id="mapsvg" viewBox="0 0 1000 600"></svg>
+        <div class="small" style="color:var(--dim)">drag to pan &middot; wheel to zoom &middot; click a node for its facts</div>
+      </div>
+      <div class="panel" id="map-detail" style="width:300px">
+        <h3>Node facts</h3>
+        <div id="map-detail-body" style="color:var(--dim)">click a node</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTEL -->
+  <section id="tab-intel" class="tab">
+    <div class="panel intel-explainer">
+      <strong>Facts</strong> &mdash; the raw evidence store, one row per
+      <em>subject &rarr; predicate &rarr; object</em> (e.g. <em>qdrant runs-as system</em>).
+      The correlation engine joins these into opportunities on the
+      <strong>Worklist</strong> tab. Rows with source <span class="badge wire-auto">wire-auto</span>
+      and conf <em>low</em> are greedy auto-extractions from the session wire &mdash;
+      useful but noisy; <em>rule out</em> anything wrong. <strong>confirmed</strong>
+      rows are what you or the agent explicitly asserted.
+    </div>
+    <div class="panel">
+      <h3>Add fact</h3>
+      <div class="row">
+        <input id="fa-subject" placeholder="subject (e.g. qdrant)" size="16">
+        <select id="fa-stype"><option value="">auto type</option><option>host</option><option>service</option><option>user</option><option>credential</option><option>file</option><option>privilege</option><option>config</option><option>endpoint</option><option>network</option><option>vuln</option><option>agent</option><option>model</option><option>rag-store</option><option>collection</option><option>token</option><option>prompt</option><option>other</option></select>
+        <input id="fa-predicate" list="predlist" placeholder="predicate" size="14">
+        <datalist id="predlist">
+          <option value="listens-on"></option><option value="runs-as"></option>
+          <option value="writable-by"></option><option value="readable-by"></option>
+          <option value="no-auth"></option><option value="on-host"></option>
+          <option value="resolves-to"></option><option value="valid-on"></option>
+          <option value="auth-accepts"></option><option value="exposes"></option>
+          <option value="has-tool"></option><option value="is-read-by"></option>
+          <option value="runs-model"></option><option value="has-skill"></option>
+          <option value="ingests"></option><option value="trusts"></option>
+        </datalist>
+        <input id="fa-object" placeholder="object (e.g. admin / us / 6333 no-auth)" size="22">
+        <select id="fa-stage"><option value="claimed">claimed</option><option value="observed">observed</option><option value="confirmed">confirmed</option></select>
+        <button class="act" id="fa-add">Add fact</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row">
+        <input id="ff-text" placeholder="filter text" size="16">
+        <input id="ff-pred" placeholder="predicate" size="12">
+        <select id="ff-conf"><option value="">any stage</option><option>claimed</option><option>observed</option><option>confirmed</option></select>
+        <select id="ff-status"><option value="">any status</option><option>active</option><option>ruled-out</option></select>
+      </div>
+    </div>
+    <div class="panel">
+      <div id="intel-summary" class="small" style="color:var(--dim);margin-bottom:8px"></div>
+      <table id="facttable"></table>
+    </div>
+  </section>
+
+  <!-- LEADS / WORKLIST -->
+  <section id="tab-leads" class="tab">
+    <div class="panel">
+      <h3>Add lead (hunch)</h3>
+      <div class="row">
+        <input id="la-obs" class="grow" placeholder="observation / hunch">
+        <select id="la-cat">
+          <option>anomaly</option><option>write-primitive</option><option>priv-context</option>
+          <option>restart-trigger</option><option>auth-gap</option><option>reachability-pivot</option>
+          <option>secret-exposure</option><option>read-exfil</option><option>llm-read-sink</option>
+          <option>action-tool</option><option>trust-edge</option><option>detection-tripwire</option>
+          <option>guardrail-blindspot</option>
+        </select>
+        <input id="la-vec" placeholder="candidate vector" size="20">
+        <button class="act" id="la-add">Add</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Worklist (ranked)</h3>
+      <table id="worklist-table"></table>
+    </div>
+  </section>
+
+  <!-- ARSENAL: payloads / detection rules / planted poison -->
+  <section id="tab-arsenal" class="tab">
+    <div class="panel">
+      <h3>Payload library</h3>
+      <div class="row">
+        <input id="pa-tech" placeholder="technique (e.g. char-spacing)" size="20">
+        <input id="pa-model" placeholder="target model" size="14">
+        <input id="pa-guard" placeholder="guardrail defeated" size="18">
+        <select id="pa-outcome"><option>untried</option><option>worked</option><option>failed</option><option>blocked</option></select>
+        <button class="act" id="pa-add">Add</button>
+      </div>
+      <div class="row"><input id="pa-body" class="grow" placeholder="payload body (optional)"></div>
+      <table id="payloads-table"></table>
+    </div>
+    <div class="panel">
+      <h3>Detection rules (read the rule, evade by mechanism)</h3>
+      <div class="row">
+        <input id="ra-name" class="grow" placeholder="rule name (e.g. AIM3: Prompt Injection Keywords)">
+        <input id="ra-src" placeholder="source (elk/phoenix)" size="12">
+        <label style="font-size:12px"><input type="checkbox" id="ra-fired"> fired</label>
+        <button class="act" id="ra-add">Add</button>
+      </div>
+      <div class="row">
+        <input id="ra-match" placeholder="match mechanism" size="20">
+        <input id="ra-blind" placeholder="blind spot" size="20">
+        <input id="ra-evade" placeholder="evasion" size="20">
+      </div>
+      <table id="rules-table"></table>
+    </div>
+    <div class="panel">
+      <h3>Planted poison (provenance &amp; cleanup)</h3>
+      <div class="row">
+        <input id="poa-loc" class="grow" placeholder="location (db row / doc / bucket key / url)">
+        <select id="poa-store"><option>kb-db</option><option>rag</option><option>minio</option><option>agent-card</option><option>registry</option><option>file</option><option>other</option></select>
+        <input id="poa-verify" placeholder="how to verify" size="18">
+        <button class="act" id="poa-add">Add</button>
+      </div>
+      <table id="poison-table"></table>
+    </div>
+  </section>
+
+  <!-- FEED -->
+  <section id="tab-feed" class="tab">
+    <div class="panel">
+      <div class="row">
+        <span class="feedtoggle">
+          <button class="act" id="mode-grouped">Grouped</button><button class="act" id="mode-raw">Raw</button>
+        </span>
+        <select id="f-source"><option value="">all sources</option><option>wire</option><option>agent</option><option>user</option><option>transcript</option></select>
+        <select id="f-kind"><option value="">all kinds</option><option>action</option><option>reasoning</option><option>note</option><option>objective</option><option>error</option><option>fact</option><option>output</option></select>
+        <input id="f-target" placeholder="target ip contains..." size="18">
+        <label class="small"><input type="checkbox" id="f-scroll" checked> autoscroll</label>
+      </div>
+    </div>
+    <div class="panel"><div id="feedlist"></div></div>
+    <div class="panel">
+      <h3>Post a note</h3>
+      <div class="row">
+        <input id="note-text" class="grow" placeholder="user note (shows in feed, source=user)">
+        <button class="act" id="note-send">Send</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Task the agent</h3>
+      <div class="row">
+        <input id="task-text" class="grow" placeholder="e.g. enumerate SMB shares on 10.10.10.5">
+        <button class="act" id="task-send">Queue task</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TARGETS -->
+  <section id="tab-targets" class="tab">
+    <div class="panel">
+      <h3>Add target</h3>
+      <div class="row">
+        <input id="nt-ip" placeholder="ip" size="14">
+        <input id="nt-host" placeholder="hostname" size="14">
+        <input id="nt-os" placeholder="os" size="12">
+        <input id="nt-role" placeholder="role" size="12">
+        <button class="act" id="nt-add">Add</button>
+      </div>
+    </div>
+    <div id="targetlist"></div>
+  </section>
+
+  <!-- OBJECTIVES & TASKS -->
+  <section id="tab-objtasks" class="tab">
+    <div class="panel">
+      <h3>Objectives</h3>
+      <div class="row">
+        <input id="obj-text" class="grow" placeholder="new objective">
+        <input id="obj-value" placeholder="value (e.g. proof string)" size="20">
+        <button class="act" id="obj-add">Add</button>
+      </div>
+      <table id="objtable" style="margin-top:8px"></table>
+    </div>
+    <div class="panel">
+      <h3>Task queue</h3>
+      <table id="tasktable"></table>
+    </div>
+  </section>
+
+  <!-- EVIDENCE -->
+  <section id="tab-evidence" class="tab">
+    <div class="panel">
+      <h3>Upload evidence</h3>
+      <div class="row">
+        <input type="file" id="ev-file">
+        <input id="ev-finding" placeholder="finding id" size="8">
+        <input id="ev-target" placeholder="target id" size="8">
+        <input id="ev-caption" placeholder="caption" size="24">
+        <button class="act" id="ev-upload">Upload</button>
+      </div>
+    </div>
+    <div class="grid" id="evgrid"></div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="tab-report" class="tab">
+    <div class="panel">
+      <div class="row">
+        <button class="act" id="rep-gen">Generate</button>
+        <button class="act" id="rep-dl-md">Download .md</button>
+        <button class="act" id="rep-dl-html">Download .html</button>
+      </div>
+    </div>
+    <div id="reportview"></div>
+  </section>
+
+  <!-- MANAGE -->
+  <section id="tab-manage" class="tab">
+    <div class="panel">
+      <h3>Engagements</h3>
+      <div class="row" style="margin-bottom:8px">
+        <button class="act" id="mng-new">+ New engagement</button>
+        <label class="muted" style="margin-left:auto"><input type="checkbox" id="mng-showarch"> show archived</label>
+      </div>
+      <div id="mng-englist"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Settings</h3>
+      <div id="mng-settings" class="settings"></div>
+      <p class="muted" style="margin:6px 0 0">Live — changes take effect immediately. A setting saved here overrides its launch environment variable.</p>
+    </div>
+
+    <div class="panel">
+      <h3>System status</h3>
+      <div id="mng-status" class="statusgrid"></div>
+    </div>
+
+    <div class="panel danger">
+      <h3>Danger zone</h3>
+      <p class="muted">Reset wipes an engagement's data (targets, facts, events, findings) but keeps the engagement. Delete removes it entirely. Both are permanent — use the buttons in the engagements table above.</p>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modalwrap" style="display:none"></div>
+<script src="/app.js"></script>
+</body>
+</html>

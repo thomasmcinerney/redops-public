@@ -1,0 +1,51 @@
+#!/bin/sh
+# Launch Kimi LOCKED to RedOps tools only — the sole-executor model.
+#
+# The agent gets NO native shell; its only way to act is the RedOps `exec`
+# broker (scope-checked + fully captured to the board). The lock is enforced
+# by [tools] disabled=["Bash"] in a DEDICATED Kimi home ($here/.kimi-home)
+# passed via KIMI_CODE_HOME — the user's own ~/.kimi-code/config.toml is never
+# touched. Credentials, OAuth and MCP registrations are symlinked in so auth
+# and the mcp__redops__* toolset work exactly as in the normal session.
+#
+# --agent-file needs Kimi's v2 engine, gated behind KIMI_CODE_EXPERIMENTAL_FLAG.
+# Any extra args (a prompt, -m model, -S to resume, etc.) pass straight through.
+#
+#   ./redops-kimi                      # interactive, locked
+#   ./redops-kimi -p "enumerate ..."   # one-shot, locked
+set -e
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+home="$here/.kimi-home"
+mkdir -p "$home"
+
+# Sync config from the user's current one and force the Bash lock into it.
+# Regenerated every launch, so user-side config changes propagate while the
+# lock can never be edited away from the launcher's side.
+python3 - "$home" <<'PYEOF'
+import os, sys
+
+home = sys.argv[1]
+src = os.path.expanduser("~/.kimi-code/config.toml")
+dst = os.path.join(home, "config.toml")
+text = open(src).read() if os.path.exists(src) else ""
+
+LOCK = '[tools]\ndisabled = ["Bash"]\n'
+if "[tools]" in text:
+    # merge Bash into an existing disabled list, or add the section entry
+    if '"Bash"' not in text:
+        text = text.replace("[tools]", '[tools]\ndisabled = ["Bash"]', 1)
+else:
+    text = text.rstrip() + "\n\n# Hard lock: ALL shell execution goes through the\n" \
+           "# redops MCP exec broker (mcp__redops__exec) — scope-checked +\n" \
+           "# captured. The native Bash tool is removed from the toolset.\n" + LOCK
+
+open(dst, "w").write(text)
+PYEOF
+
+# Auth + MCP wiring: share, never copy, so tokens refresh in one place.
+ln -sfn ~/.kimi-code/oauth "$home/oauth"
+ln -sfn ~/.kimi-code/credentials "$home/credentials"
+ln -sfn ~/.kimi-code/mcp.json "$home/mcp.json"
+
+exec env KIMI_CODE_HOME="$home" KIMI_CODE_EXPERIMENTAL_FLAG=1 \
+    ~/.kimi-code/bin/kimi --agent-file "$here/agents/redops.md" "$@"
