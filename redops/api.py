@@ -2116,8 +2116,11 @@ async def put_scope(engagement_id: int, request: Request):
             db.set_state(conn, f"scope_out:{engagement_id}", json.dumps(result["out"]))
         if "web" in b:
             try:
-                result["web"] = webscope.normalize_scope(
-                    b["web"].get("pages", []), b["web"].get("api_prefixes", []))
+                pages = b["web"].get("pages", [])
+                api_prefixes = b["web"].get("api_prefixes", [])
+                result["web"] = ({"pages": [], "api_prefixes": []}
+                                 if pages == [] and api_prefixes == [] else
+                                 webscope.normalize_scope(pages, api_prefixes))
             except (AttributeError, ValueError) as exc:
                 raise HTTPException(400, str(exc)) from exc
             db.set_state(conn, f"web_scope:{engagement_id}", json.dumps(result["web"]))

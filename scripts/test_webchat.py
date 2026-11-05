@@ -67,6 +67,12 @@ class WebCaptureApiTest(unittest.TestCase):
                     direct = dict(payload, source_id="run:003",
                                   action={"type": "api", "url": "https://chat.example.test/admin"})
                     self.assertEqual(client.post("/api/webchat/capture", json=direct).status_code, 403)
+                    cleared = client.put(f"/api/scope/{eid}", json={
+                        "web": {"pages": [], "api_prefixes": []}})
+                    self.assertEqual(cleared.status_code, 200, cleared.text)
+                    self.assertEqual(cleared.json()["web"]["pages"], [])
+                    self.assertEqual(client.post("/api/webchat/capture", json=dict(
+                        payload, source_id="run:004")).status_code, 403)
 
 
 class ReportImportTest(unittest.TestCase):

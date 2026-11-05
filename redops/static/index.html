@@ -45,6 +45,14 @@
         <input id="scope-out" placeholder="10.0.0.0/8, 192.168.99.99" size="22">
         <button class="act" id="scope-save">Save scope</button>
       </div>
+      <div class="row" style="margin-top:8px; align-items:flex-start; flex-wrap:wrap">
+        <label class="small" for="scope-web-pages" style="min-width:140px">chatbot pages<br><span style="color:var(--dim)">exact URLs, one per line</span></label>
+        <textarea id="scope-web-pages" rows="2" style="flex:1; min-width:280px" placeholder="https://chat.example.test/help"></textarea>
+      </div>
+      <div class="row" style="margin-top:6px; align-items:flex-start; flex-wrap:wrap">
+        <label class="small" for="scope-web-api" style="min-width:140px">messaging API routes<br><span style="color:var(--dim)">prefixes, one per line</span></label>
+        <textarea id="scope-web-api" rows="2" style="flex:1; min-width:280px" placeholder="Add only observed chatbot API prefixes"></textarea>
+      </div>
     </div>
     <div class="sitrep-cards">
       <div class="panel">

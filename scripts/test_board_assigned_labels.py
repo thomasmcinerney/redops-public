@@ -33,6 +33,7 @@ const $=selector=>nodes[selector];
 const esc=value=>String(value);
 const api=async()=>rows;
 const syncSwitcher=()=>{};
+const layoutScope=()=>{};
 """ + load_targets + "\n" + build_switcher + "\n" + """
 await loadTargets();
 assert.equal(nodes['#s-tgt'].textContent,2);

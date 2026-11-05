@@ -529,6 +529,8 @@ async function loadSitrepAll() {
   if (document.activeElement !== $("#sr-intent")) $("#sr-intent").value = sr.commander_intent || "";
   if (document.activeElement !== $("#scope-in")) $("#scope-in").value = (scope.in || []).join(", ");
   if (document.activeElement !== $("#scope-out")) $("#scope-out").value = (scope.out || []).join(", ");
+  if (document.activeElement !== $("#scope-web-pages")) $("#scope-web-pages").value = (scope.web?.pages || []).join("\n");
+  if (document.activeElement !== $("#scope-web-api")) $("#scope-web-api").value = (scope.web?.api_prefixes || []).join("\n");
   if (document.activeElement !== $("#sr-activity")) $("#sr-activity").value = sr.activity || "";
   if (document.activeElement !== $("#sr-hypothesis")) $("#sr-hypothesis").value = sr.hypothesis || "";
   if (document.activeElement !== $("#sr-next")) $("#sr-next").value = sr.next_steps || "";
@@ -589,9 +591,11 @@ $("#sr-intent-save").addEventListener("click", async () => {
 $("#scope-save").addEventListener("click", async () => {
   const eng = currentEngagement();
   if (!eng) return;
-  const parse = (v) => v.split(",").map((s) => s.trim()).filter(Boolean);
+  const parse = (v) => v.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
   await api(`/api/scope/${eng}`, { method: "PUT", json: {
-    in: parse($("#scope-in").value), out: parse($("#scope-out").value) } });
+    in: parse($("#scope-in").value), out: parse($("#scope-out").value),
+    web: { pages: parse($("#scope-web-pages").value),
+           api_prefixes: parse($("#scope-web-api").value) } } });
   loadSitrepAll();
 });
 
@@ -1059,7 +1063,7 @@ function newEngagementModal(onCreate) {
     <input class="confirm" id="m-name" autocomplete="off" placeholder="e.g. CLIENT-LAB">
     <label class="mlbl">Clone from <span class="muted">— optional: copies the scope + the host list (not recon)</span></label>
     <select class="confirm" id="m-copyscope"><option value="">— none, type it below</option></select>
-    <label class="mlbl">Scope <span class="muted">— CIDR(s)/IPs, space or comma separated</span></label>
+    <label class="mlbl">Scope <span class="muted">— CIDR(s), IPs, or exact HTTPS pages</span></label>
     <input class="confirm" id="m-scope" autocomplete="off" placeholder="192.0.2.0/24">
     <label class="mlbl">Notes <span class="muted">— optional</span></label>
     <input class="confirm" id="m-notes" autocomplete="off" placeholder="what this engagement is">

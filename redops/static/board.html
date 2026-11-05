@@ -148,6 +148,14 @@
     letter-spacing:.1em; color:var(--faint); pointer-events:none}
   .boardempty{position:absolute; inset:0; display:grid; place-items:center; text-align:center;
     color:var(--faint); font-size:12px; line-height:1.8; pointer-events:none}
+  .webscope-panel{position:absolute; z-index:3; left:16px; top:50px; width:min(600px,calc(100% - 32px));
+    max-height:45%; overflow:auto; padding:12px 14px; border:1px solid var(--line);
+    border-left:3px solid var(--amber); border-radius:6px; background:rgba(12,17,25,.95);
+    box-shadow:0 8px 24px rgba(0,0,0,.25); font:11px var(--mono); color:var(--text)}
+  .webscope-panel .ws-title{color:var(--amber); font-size:9px; letter-spacing:.16em; margin-bottom:8px}
+  .webscope-panel .ws-label{color:var(--dim); font-size:9px; letter-spacing:.1em; margin:8px 0 4px}
+  .webscope-panel .ws-item{overflow-wrap:anywhere; line-height:1.5; color:var(--teal)}
+  .webscope-panel .ws-empty{color:var(--dim)}
 
   .vectors{flex:1; overflow-y:auto; padding:4px 14px 14px; display:flex; flex-direction:column; gap:10px}
   /* SITREP — the agent's own "what/why" briefing, surfaced on the board */
@@ -373,7 +381,7 @@
     <nav class="switcher" id="switcher"></nav>
     <div class="spacer"></div>
     <div class="stats"><span><b id="s-tgt">0</b> identified / <b id="s-assigned">0</b> assigned</span><span><b id="s-fact">0</b> facts</span>
-      <span><b id="s-opp">0</b> vectors</span></div>
+      <span><b id="s-opp">0</b> vectors</span><span id="s-webstat" style="display:none"><b id="s-web">0</b> web pages</span></div>
     <div class="agent" title="Live capture status (ACP session or wiretail)"><span class="dot" id="dot"></span><b>CAPTURE</b><span class="stat" id="astat">—</span></div>
     <button class="agent wpill" id="wpill" title="Wire sensor (tcpdump) — click to start/stop packet capture"><span class="dot" id="wdot"></span><b>WIRE</b><span class="stat" id="wstat">—</span></button>
   </header>
@@ -435,6 +443,7 @@
       </div>
       <div class="zoomui"><button id="zoomin" title="Zoom in">+</button><button id="zoomout" title="Zoom out">−</button><button id="zoomrst" title="Reset view">⤢</button></div>
       <div class="boardempty" id="bempty"></div>
+      <div class="webscope-panel" id="webscope-panel" style="display:none" aria-label="Web pages in scope"></div>
       <div class="legend" id="legend"></div>
     </section>
     <div class="gut gv" id="gutR" title="drag to resize the right panel"></div>
@@ -523,7 +532,7 @@ function shortLabel(name){let s=(name||"").replace(/^https?:\/\//,"");   // drop
 function hexPath(x,y,r){ctx.beginPath();for(let i=0;i<6;i++){const a=Math.PI/6+i*Math.PI/3;
   const px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();}
 
-let engId=null, level="scope";
+let engId=null, level="scope", webScope={pages:[],api_prefixes:[]};
 let targets=[], gnodes=[], gedges=[], allFacts=[], byId={}, opps=[], toolSpecs={}, hostMeta={};
 let tnodes={}, reveals={};           // scope target-nodes + reveal flash times
 // live animation layer (fed by the real SSE event stream)
@@ -660,6 +669,28 @@ async function loadHeader(){
 }
 function setEngName(e){$("#engname").textContent=e?(e.name||("#"+e.id)):"—";
   $("#engchip").title=e?("Active engagement: "+(e.name||"#"+e.id)+(e.scope?"  ·  "+e.scope:"")):"Active engagement";}
+function renderWebScope(){
+  const pages=webScope.pages||[], routes=webScope.api_prefixes||[];
+  const panel=$("#webscope-panel"), hasScope=pages.length||routes.length;
+  panel.style.display=(level==="scope"&&hasScope)?"block":"none";
+  panel.innerHTML=hasScope
+    ? `<div class="ws-title">WEB SCOPE · ${pages.length} EXACT PAGE${pages.length===1?"":"S"}</div>`
+      +`<div class="ws-label">CHATBOT PAGES</div>`
+      +pages.map(url=>`<div class="ws-item">${esc(url)}</div>`).join("")
+      +`<div class="ws-label">MESSAGING API PREFIXES</div>`
+      +(routes.length?routes.map(url=>`<div class="ws-item">${esc(url)}</div>`).join("")
+        :`<div class="ws-empty">none configured</div>`)
+    :"";
+  $("#s-web").textContent=pages.length;
+  $("#s-webstat").style.display=pages.length?"":"none";
+}
+async function loadWebScope(){
+  if(!engId){webScope={pages:[],api_prefixes:[]};renderWebScope();return;}
+  try{const result=await api(`/api/scope/${engId}`);
+    webScope=result.web||{pages:[],api_prefixes:[]};}
+  catch(e){webScope={pages:[],api_prefixes:[]};}
+  renderWebScope();
+}
 async function loadTargets(){
   try{ targets=await api(`/api/targets${engId?`?engagement_id=${engId}`:""}`);}catch(e){targets=[];}
   $("#s-tgt").textContent=targets.filter(t=>t.status!=="unidentified").length;
@@ -958,7 +989,7 @@ function setLevel(v){level=(v==="scope")?"scope":+v; view=null; pan={x:0,y:0};dZ
   // per-host entity graph — hide it in drill-in.
   const ff=$("#flowfilter"); if(ff)ff.style.display=(level==="scope")?"flex":"none";
   $("#layout-picker").style.display=(level==="scope")?"flex":"none";
-  renderLegend();
+  renderLegend();renderWebScope();
 }
 
 // ---------- detail (entity graph, filtered to target) ----------
@@ -1107,7 +1138,7 @@ function zoomAt(cx,cy,f){const nz=Math.max(.4,Math.min(4.5,sZoom*f)),k=nz/sZoom;
   sPan.x=cx-(cx-sPan.x)*k;sPan.y=cy-(cy-sPan.y)*k;sZoom=nz;clampScopePan();}
 function drawScope(){
   const list=Object.values(tnodes);
-  $("#bempty").style.display=list.length?"none":"grid";
+  $("#bempty").style.display=(list.length||(webScope.pages||[]).length)?"none":"grid";
   $("#bempty").innerHTML="no hosts in scope yet<br><span style='color:var(--dim)'>add targets, then recon reveals them</span>";
   const op=scopeOperator(), now=performance.now();   // operator anchor (zoom/pan aware) + frame clock
   // edges: operator -> identified targets. A hot host (recent activity) lights
@@ -1642,7 +1673,7 @@ async function loadSitrep(){if(!engId)return; let s={};
     ago.title=n>40?`${n} target-attributed events since the agent last wrote this sitrep — it may be behind the map`:"";}}
 // ---------- live ----------
 let rT=null; function scheduleRefresh(){clearTimeout(rT);rT=setTimeout(async()=>{
-  await Promise.all([loadTargets(),loadGraph(),loadVectors(),loadRuns(),loadSitrep()]);
+  await Promise.all([loadTargets(),loadWebScope(),loadGraph(),loadVectors(),loadRuns(),loadSitrep()]);
   if(inspFocus){await hydrate();renderInspector();}   // live-update the open inspector (co-op)
 },600);}
 function connectSSE(){const es=new EventSource("/api/stream");
@@ -1665,10 +1696,10 @@ function connectSSE(){const es=new EventSource("/api/stream");
 async function pollEngagement(){
   let id=null; try{id=(await api("/api/active_engagement")).id;}catch(e){return;}
   if(id==null||id===engId)return;
-  engId=id; level="scope"; view=null; inspFocus=null; tnodes={}; reveals={};
+  engId=id; level="scope"; webScope={pages:[],api_prefixes:[]}; renderWebScope(); view=null; inspFocus=null; tnodes={}; reveals={};
   ent={}; byId={}; gnodes=[]; gedges=[]; liveFlows=[]; drops=[]; noise=[]; motions=[]; closeInspector(); hideFlowPop();
   try{const list=await api("/api/engagements"); setEngName(list.find(x=>x.id===engId));}catch(e){}
-  await Promise.all([loadTargets(),loadGraph(),loadVectors(),loadFeed(),loadFlows(),loadSitrep()]);
+  await Promise.all([loadTargets(),loadWebScope(),loadGraph(),loadVectors(),loadFeed(),loadFlows(),loadSitrep()]);
   setLevel("scope");
 }
 
@@ -1721,11 +1752,12 @@ function setupResizers(){
 }
 async function init(){setupResizers();setupLayoutPicker();resize();await loadHeader();
   try{(await api("/api/tools/specs")).forEach(s=>toolSpecs[s.name]=s);}catch(e){}
-  await Promise.all([loadTargets(),loadGraph(),loadVectors(),loadFeed(),loadFlows(),loadSitrep()]);
+  await Promise.all([loadTargets(),loadWebScope(),loadGraph(),loadVectors(),loadFeed(),loadFlows(),loadSitrep()]);
   setLevel("scope"); connectSSE(); loadRuns();
   setInterval(pollEngagement,3000);
   setInterval(pollInspector,2000);
   setInterval(loadSitrep,6000);  // the agent's briefing (its own event doesn't full-refresh)
+  setInterval(loadWebScope,6000); // scope edits in the dashboard appear on the board
   setInterval(loadFlows,2000);   // reconcile the live-connection set (drops age out)
   setInterval(loadRuns,1000);   // scan-state animation tracks the real queue closely
   setInterval(refreshHealth,15000); refreshPermissions(); setInterval(refreshPermissions,4000);
