@@ -387,3 +387,21 @@ scripts/            smoke tests + spikes
 ## Engagement reports
 
 RedOps captures every command and its complete output in the engagement ledger. Use the Report tab or `redops export` for a readable Markdown or HTML overview. For a full evidence PDF with exact commands, complete output, scripts, screenshots, and proof values, use the bundled [report kit](report-kit/README.md) and [integration guide](REPORT_INTEGRATION.md). Review the output before sharing it.
+
+## Browser chatbot engagements
+
+RedOps supports exact HTTPS page scope alongside IP/CIDR scope. Create a new
+engagement with the chatbot page URL in `scope`, then use MCP `web_scope_show`
+and `web_scope_set` to inspect or set `pages` and observed messaging
+`api_prefixes`. The `webchat_capture.py` adapter in the companion Grok runner
+checks that scope before driving a browser or replaying a direct API action.
+Its `/api/webchat/capture` endpoint stores the exact action, widget output,
+network exchange, and artifact hashes under the engagement. Reusing a source
+ID with changed content is rejected. The report kit's `webchat_import.py`
+imports completed browser actions and direct screenshots into a case. See
+[report-kit/README.md](report-kit/README.md) and the
+[Grok runner guide](https://github.com/thomasmcinerney/grok-redops-runner).
+
+The browser scope is enforced by the adapter and capture endpoint. Shell
+command scope remains a separate IP/hostname guard; use the browser adapter
+for chatbot actions.

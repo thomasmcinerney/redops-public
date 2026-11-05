@@ -1478,6 +1478,23 @@ def cve_lookup(product: str, version: str = "", vendor: str = "", target_ip: str
 
 
 @mcp.tool()
+def web_scope_show() -> str:
+    """Exact pages and API prefixes authorized for browser-chat capture."""
+    return _j(req("GET", f"/api/scope/{_engagement()}").get("web", {}))
+
+
+@mcp.tool()
+def web_scope_set(pages: list[str], api_prefixes: list[str] | None = None) -> str:
+    """Set exact page URLs and observed messaging API prefixes for this engagement.
+
+    The browser adapter enforces this scope. Generic shell commands use the
+    separate IP/hostname guard and must not be used for unscoped web replay.
+    """
+    body = {"web": {"pages": pages, "api_prefixes": api_prefixes or []}}
+    return _j(req("PUT", f"/api/scope/{_engagement()}", body).get("web", {}))
+
+
+@mcp.tool()
 def engagement_add(name: str, scope: str, notes: str = "") -> str:
     """Create an isolated engagement with an explicit scope boundary.
 
@@ -1486,13 +1503,23 @@ def engagement_add(name: str, scope: str, notes: str = "") -> str:
     """
     if not name.strip() or not scope.strip():
         raise ApiError("name and scope are required")
-    try:
-        nets = [str(ipaddress.ip_network(part, strict=False))
-                for part in re.split(r"[\s,]+", scope.strip()) if part]
-    except ValueError as exc:
-        raise ApiError(f"invalid CIDR in scope: {exc}") from exc
+    entries = []
+    for part in re.split(r"[\s,]+", scope.strip()):
+        if not part:
+            continue
+        if part.startswith(("https://", "http://")):
+            from redops import webscope
+            try:
+                entries.append(webscope.canonical_url(part))
+            except ValueError as exc:
+                raise ApiError(str(exc)) from exc
+        else:
+            try:
+                entries.append(str(ipaddress.ip_network(part, strict=False)))
+            except ValueError as exc:
+                raise ApiError(f"invalid CIDR or web URL in scope: {part}") from exc
     return _j(req("POST", "/api/engagements",
-                  {"name": name.strip(), "scope": ", ".join(nets), "notes": notes}))
+                  {"name": name.strip(), "scope": ", ".join(entries), "notes": notes}))
 
 
 @mcp.tool()

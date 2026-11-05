@@ -24,7 +24,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
 from fastapi.staticfiles import StaticFiles
 
 from . import (acp, analyst, correlate, db, export, leads, netsensor, retention,
-               scope, tools, wiretail)
+               scope, tools, webscope, wiretail)
 
 HOST = os.environ.get("REDOPS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("REDOPS_PORT", "9100"))
@@ -35,7 +35,7 @@ app = FastAPI(title="RedOps")
 TARGET_STATUSES = {"unidentified", "identified", "foothold", "rooted", "flagged"}
 SEVERITIES = {"info", "low", "medium", "high", "critical"}
 EVENT_SOURCES = {"wire", "agent", "user", "transcript", "analyst", "acp"}
-EVENT_KINDS = {"action", "reasoning", "note", "objective", "error", "fact", "output"}
+EVENT_KINDS = {"action", "reasoning", "note", "objective", "error", "fact", "output", "webchat"}
 # legacy one-shot cred vocabulary (kept for the `cred add` sugar / CLI choices);
 # these map onto the decomposed principal/secret/binding model below.
 CRED_KINDS = {"password", "hash", "ticket", "key", "token", "api-key", "principal"}
@@ -273,14 +273,23 @@ async def create_engagement(request: Request):
         # ALLOWLIST (guard, exec broker, netsensor BPF, the board's scope panel all
         # read this state key, not the engagements.scope column). Previously the
         # value sat only in that column and nothing on screen reflected it.
-        nets = []
+        nets, web_pages = [], []
         for tok in (b.get("scope") or "").replace(",", " ").split():
+            if tok.startswith(("http://", "https://")):
+                try:
+                    web_pages.append(webscope.canonical_url(tok))
+                except ValueError as exc:
+                    raise HTTPException(400, str(exc)) from exc
+                continue
             try:
                 nets.append(ipaddress.ip_network(tok, strict=False))
             except ValueError:
-                continue
+                raise HTTPException(400, f"invalid scope entry: {tok!r}")
         if nets:
             db.set_state(conn, f"scope_in:{rid}", json.dumps([str(n) for n in nets]))
+        if web_pages:
+            db.set_state(conn, f"web_scope:{rid}",
+                         json.dumps(webscope.normalize_scope(web_pages, [])))
         # A scope entry that is a single host (/32, /128) is a target — surface it
         # on the map. A multi-host range is a boundary, not a target, so it only
         # sets scope. Loopback is excluded unless opted in.
@@ -1296,6 +1305,51 @@ def list_events(limit: int = 200, source: str | None = None, kind: str | None = 
         conn.close()
 
 
+@app.post("/api/webchat/capture", status_code=201)
+async def capture_webchat(request: Request):
+    """Store a complete browser exchange for one engagement-scoped page."""
+    b = await request.json()
+    eid = b.get("engagement_id")
+    if not isinstance(eid, int):
+        raise HTTPException(400, "engagement_id required")
+    source_id = str(b.get("source_id") or "").strip()
+    if not source_id or len(source_id) > 160:
+        raise HTTPException(400, "source_id required (max 160 characters)")
+    page_url = str(b.get("page_url") or "")
+    action = b.get("action")
+    if not isinstance(action, dict):
+        raise HTTPException(400, "action object required")
+    conn = db.connect()
+    try:
+        if not db.row(conn, "SELECT id FROM engagements WHERE id=?", (eid,)):
+            raise HTTPException(404, "engagement not found")
+        raw_scope = db.get_state(conn, f"web_scope:{eid}", "")
+        web = json.loads(raw_scope) if raw_scope else {"pages": [], "api_prefixes": []}
+        if not webscope.page_allowed(page_url, web):
+            raise HTTPException(403, "page URL outside web-chat scope")
+        if action.get("type") == "api" and not webscope.api_allowed(
+                str(action.get("url") or ""), web):
+            raise HTTPException(403, "API URL outside web-chat scope")
+        payload = {"source_id": source_id, "page_url": page_url,
+                   "action": action, "output": b.get("output"),
+                   "network": b.get("network"), "artifact_hashes": b.get("artifact_hashes")}
+        text = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        previous = db.row(conn, """SELECT * FROM events
+            WHERE engagement_id=? AND kind='webchat'
+              AND json_extract(meta_json, '$.source_id')=? LIMIT 1""",
+                          (eid, source_id))
+        if previous:
+            if previous["text"] != text:
+                raise HTTPException(409, "source_id already has different content")
+            return previous
+        rid = db.add_event(conn, "agent", "webchat", text,
+                           meta={"source_id": source_id, "page_url": page_url},
+                           engagement_id=eid)
+        return db.row(conn, "SELECT * FROM events WHERE id=?", (rid,))
+    finally:
+        conn.close()
+
+
 @app.post("/api/events", status_code=201)
 async def create_event(request: Request):
     b = await request.json()
@@ -2021,7 +2075,13 @@ def get_scope(engagement_id: int):
                 return json.loads(raw) if raw else []
             except json.JSONDecodeError:
                 return []
-        return {"engagement_id": engagement_id, "in": load("scope_in"), "out": load("scope_out")}
+        web_raw = db.get_state(conn, f"web_scope:{engagement_id}", "")
+        try:
+            web = json.loads(web_raw) if web_raw else {"pages": [], "api_prefixes": []}
+        except json.JSONDecodeError:
+            web = {"pages": [], "api_prefixes": []}
+        return {"engagement_id": engagement_id, "in": load("scope_in"),
+                "out": load("scope_out"), "web": web}
     finally:
         conn.close()
 
@@ -2054,6 +2114,16 @@ async def put_scope(engagement_id: int, request: Request):
         if "out" in b:
             result["out"] = clean(b["out"], "out")
             db.set_state(conn, f"scope_out:{engagement_id}", json.dumps(result["out"]))
+        if "web" in b:
+            try:
+                result["web"] = webscope.normalize_scope(
+                    b["web"].get("pages", []), b["web"].get("api_prefixes", []))
+            except (AttributeError, ValueError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+            db.set_state(conn, f"web_scope:{engagement_id}", json.dumps(result["web"]))
+        else:
+            raw_web = db.get_state(conn, f"web_scope:{engagement_id}", "")
+            result["web"] = json.loads(raw_web) if raw_web else {"pages": [], "api_prefixes": []}
         # return the full picture
         for key in ("in", "out"):
             if key not in result:
@@ -2070,7 +2140,7 @@ async def put_scope(engagement_id: int, request: Request):
 def _copy_scope(conn, src_id, dst_id) -> None:
     """Copy the scope — the structured in/out allow/block lists — from one
     engagement to another."""
-    for key in ("scope_in", "scope_out"):
+    for key in ("scope_in", "scope_out", "web_scope"):
         raw = db.get_state(conn, f"{key}:{src_id}")
         if raw:
             db.set_state(conn, f"{key}:{dst_id}", raw)

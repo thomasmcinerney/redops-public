@@ -123,8 +123,8 @@ def test_F5_encoding_in_chain_blocked():
 
 def test_encoded_in_scope_still_allowed():
     # a numeric encoding of an IN-scope address is fine
-    d = scope.check_command("nmap 3232294404", ["198.51.100.0/24"], [], resolve=False)
-    assert d.allowed          # 3232294404 = 198.51.100.4
+    d = scope.check_command("nmap 3325256708", ["198.51.100.0/24"], [], resolve=False)
+    assert d.allowed          # 3325256708 = 198.51.100.4
 
 
 def test_no_false_positive_on_ports_rates_timing():

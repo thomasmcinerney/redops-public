@@ -14,6 +14,8 @@ Run `python report-kit/report.py <command> --help` for the exact options. Use `r
 
 For RedOps-controlled target actions, import captured runs into the case with `report_import_runs` or `report_import_run`. The importer preserves the original command, complete output, source engagement and run ID, and rejects changed reimports. Typed HTTP actions receive a copy/paste `curl` reproduction command.
 
+For browser chatbot scenarios captured by `webchat_capture.py`, import the private manifest with `python report-kit/webchat_import.py ./case ./private/lane-01-capture/manifest.json --target chat --stage recon`. Each completed action becomes a browser event with exact input, widget output, raw network transcript, and a direct screenshot. Reimporting the same run is safe; changed evidence under an existing source ID is rejected. Keep the original manifest and uploads with the case evidence.
+
 ## Build and review
 
 ```sh
