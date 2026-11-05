@@ -332,6 +332,23 @@ redops task done <ID>
 Review `poison_list()` before closing an engagement. After verifying removal,
 call `poison_mark_cleaned(poison_id, note)` so the board records cleanup.
 
+## Browser chatbot engagements
+
+For a chatbot assessment, create a fresh engagement with the **exact HTTPS page
+URL** in `engagement_add(name, scope)`. Confirm the `web.pages` entry in
+`session_brief` or `web_scope_show`. Add only observed messaging routes with
+`web_scope_set(pages, api_prefixes)` before direct API replay. Page scope does
+not authorize arbitrary endpoints on the same host.
+
+Run the companion `webchat_capture.py` only through RedOps `exec`, with one
+private output directory and browser context per lane. It records the exact
+scenario input, widget output, chat transport, screenshots, timestamps, and
+hashes, and posts completed or failed actions to the active engagement. Use
+`--headed` when a site requires interactive browser verification. For a
+message, verify a messaging request contains the input and the widget shows
+the user message and response; action completion alone is insufficient. Import
+its manifest into a report case and keep real captures outside public Git.
+
 ## 5. Layout
 
 - Server: `~/redops` (`redops/api.py`, `db.py`, `wiretail.py`, `export.py`, `cli.py`)
